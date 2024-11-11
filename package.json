@@ -1,0 +1,33 @@
+{
+  "name": "local-hook-cli",
+  "version": "0.1.0-beta",
+  "description": "WebSocket client CLI for interacting with a microservice",
+  "main": "cli.js",
+  "scripts": {
+    "start": "node cli.js"
+  },
+  "keywords": [
+    "websocket",
+    "cli",
+    "microservice"
+  ],
+  "bin": {
+    "socketlink": "./cli.js"
+  },
+  "author": "boytur",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.21.4",
+    "node-fetch": "^3.3.2",
+    "ws": "^8.18.0",
+    "yargs": "^17.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BSO-Space/local-hook-cli.git"
+  },
+  "homepage": "https://github.com/BSO-Space/local-hook-clis#readme",
+  "bugs": {
+    "url": "https://github.com/BSO-Space/local-hook-cli/issues"
+  }
+}
