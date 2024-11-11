@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import WebSocket from "ws";
 import yargs from "yargs";
 import fetch from "node-fetch";
