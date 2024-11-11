@@ -73,38 +73,35 @@ ws.on("open", () => {
 // Handle incoming WebSocket message
 ws.on("message", async (data: WebSocket.Data) => {
   const message = data.toString();
-  console.log(`[${getCurrentTime()}] [INFO] Received message: ${message}`);
 
-  // Log all messages except 'user.login' events
-  if (!message.includes("user.login")) {
-    console.log(
-      `[${getCurrentTime()}] [INFO] General WebSocket Message: ${message}`
-    );
-  }
+  console.log(`[${getCurrentTime()}] [INFO] Received message: ${message}`);
 
   // Only attempt to parse the message if it's JSON
   if (isJsonString(message)) {
     try {
+      // Parse the message to convert it from a JSON string to an object
       const result = JSON.parse(message);
 
-      if (result.event == "user.login") {
+      // Parse the payload to convert it from a JSON string to an object
+      const payload = JSON.parse(result.payload);
+
+      // Log all messages except 'user.login' events
+      if (payload.event !== "user.login") {
+        console.log(
+          `[${getCurrentTime()}] [INFO] Handling '${payload.event}' event`
+        );
+        console.log(
+          `[${getCurrentTime()}] [INFO] General WebSocket Message: ${message}`
+        );
+      }
+
+      // Handle 'user.login' events
+      if (payload.event === "user.login") {
         console.log(`[${getCurrentTime()}] [INFO] Handling 'user.login' event`);
 
-        // Mask the payload before logging
-        const maskedPayload = {
-          user: {
-            id: result.payload.user.id,
-            username: result.payload.user.username,
-          },
-          service: result.payload.service,
-          ip: result.payload.ip,
-          userAgent: result.payload.userAgent,
-        };
-
-        // Log the masked payload
+        // Log the sending data to the microservice
         console.log(
-          `[${getCurrentTime()}] [INFO] Sending login data to microservice:`,
-          maskedPayload
+          `[${getCurrentTime()}] [INFO] Sending login data to microservice:`
         );
 
         // Send data to microservice
@@ -115,7 +112,7 @@ ws.on("message", async (data: WebSocket.Data) => {
             "x-hook-token": result.token,
             "x-hook-signature": result.signature,
           },
-          body: JSON.stringify(result.payload),
+          body: JSON.stringify(payload),
         });
 
         const resData = await res.json();
@@ -149,6 +146,7 @@ ws.on("message", async (data: WebSocket.Data) => {
 function isJsonString(str: string): boolean {
   try {
     JSON.parse(str);
+    console.log(`[${getCurrentTime()}] [INFO] Incoming message is valid JSON`);
     return true;
   } catch (e) {
     return false;
