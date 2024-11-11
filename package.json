@@ -1,6 +1,6 @@
 {
   "name": "local-hook-cli",
-  "version": "0.2.1-beta",
+  "version": "0.2.2-beta",
   "description": "WebSocket client CLI for interacting with a microservice",
   "main": "cli.js",
   "scripts": {
