@@ -15,152 +15,142 @@ console.log(
     })
   )
 );
-console.log(chalk.yellow("Socketlink is running...\n"));
 
-// CLI arguments
-const argv = await yargs(process.argv.slice(2))
-  .option("url", {
-    alias: "u",
-    type: "string",
-    demandOption: true,
-    description: "WebSocket server URL, e.g., ws://localhost:3001",
-  })
-  .option("microservice-url", {
-    alias: "m",
-    type: "string",
-    demandOption: true,
-    description: "Local URL of the microservice, e.g., http://localhost:5000",
-  })
-  .option("token", {
-    alias: "t",
-    type: "string",
-    demandOption: true,
-    description: "Authentication token to send with the microservice URL",
-  })
-  .help()
-  .alias("help", "h").argv;
+yargs(process.argv.slice(2))
+  .command(
+    "listen",
+    "Start listening to a WebSocket server and forward events",
+    (yargs) => {
+      return yargs
+        .option("url", {
+          alias: "u",
+          type: "string",
+          demandOption: true,
+          description:
+            "WebSocket server URL, e.g., ws://labs.bsospace.com:3204",
+        })
+        .option("forward", {
+          alias: "f",
+          type: "string",
+          demandOption: true,
+          description:
+            "Local URL to forward event data, e.g., http://localhost:5000",
+        })
+        .option("event", {
+          alias: "e",
+          type: "array",
+          demandOption: true,
+          description:
+            "List of events to listen for, e.g., user.login order.created",
+        })
+        .option("token", {
+          alias: "t",
+          type: "string",
+          demandOption: true,
+          description: "Authentication token to send with the microservice URL",
+        });
+    },
+    async (argv) => {
+      const url: string = argv.url as string;
+      const forwardUrl: string = argv.forward as string;
+      const events: string[] = (argv.event as string[]).map((e) =>
+        e.toString()
+      );
+      const token: string = argv.token as string;
 
-const url: string = argv.url;
-const microserviceUrl: string = argv["microservice-url"];
-const token: string = argv.token;
+      const ws = new WebSocket(url);
 
-// Create a WebSocket client
-const ws = new WebSocket(url);
-
-// Function to get the current time in ISO format
-function getCurrentTime(): string {
-  return new Date().toISOString();
-}
-
-ws.on("open", () => {
-  console.log(
-    `[${getCurrentTime()}] [INFO] Connected to WebSocket server at ${url}`
-  );
-
-  // Combine token and microservice URL into one object
-  const message = {
-    token: token,
-    microserviceUrl: microserviceUrl,
-  };
-
-  // Send the message as a JSON string
-  console.log(
-    `[${getCurrentTime()}] [INFO] Sending connection message with token and microservice URL`
-  );
-  ws.send(JSON.stringify(message));
-});
-
-// Handle incoming WebSocket message
-ws.on("message", async (data: WebSocket.Data) => {
-  const message = data.toString();
-
-  console.log(`[${getCurrentTime()}] [INFO] Received message: ${message}`);
-
-  // Only attempt to parse the message if it's JSON
-  if (isJsonString(message)) {
-    try {
-      // Parse the message to convert it from a JSON string to an object
-      const result = JSON.parse(message);
-
-      // Parse the payload to convert it from a JSON string to an object
-      const payload = JSON.parse(result.payload);
-
-      // Log all messages except 'user.login' events
-      if (payload.event !== "user.login") {
-        console.log(
-          `[${getCurrentTime()}] [INFO] Handling '${payload.event}' event`
-        );
-        console.log(
-          `[${getCurrentTime()}] [INFO] General WebSocket Message: ${message}`
-        );
+      function getCurrentTime(): string {
+        return new Date().toISOString();
       }
 
-      // Handle 'user.login' events
-      if (payload.event === "user.login") {
-        console.log(`[${getCurrentTime()}] [INFO] Handling 'user.login' event`);
-
-        // Log the sending data to the microservice
+      ws.on("open", () => {
         console.log(
-          `[${getCurrentTime()}] [INFO] Sending login data to microservice:`
+          `[${getCurrentTime()}] [INFO] Connected to WebSocket server at ${url}`
         );
 
-        // Send data to microservice
-        const res = await fetch(microserviceUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-hook-token": result.token,
-            "x-hook-signature": result.signature,
-          },
-          body: JSON.stringify(payload),
-        });
+        const message = { token, microserviceUrl: forwardUrl };
+        console.log(
+          `[${getCurrentTime()}] [INFO] Sending connection message with token and microservice URL`
+        );
+        ws.send(JSON.stringify(message));
+      });
 
-        const resData = await res.json();
+      ws.on("message", async (data: WebSocket.Data) => {
+        const message = data.toString();
+        console.log(
+          `[${getCurrentTime()}] [INFO] Received message: ${message}`
+        );
 
-        if (res.ok) {
-          console.log(
-            `[${getCurrentTime()}] [INFO] Data sent to microservice successfully`
-          );
+        if (isJsonString(message)) {
+          try {
+            const result = JSON.parse(message);
+            const payload = JSON.parse(result.payload);
+
+            if (events.includes(payload.event)) {
+              console.log(
+                `[${getCurrentTime()}] [INFO] Handling '${payload.event}' event`
+              );
+
+              const res = await fetch(forwardUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-hook-token": result.token,
+                  "x-hook-signature": result.signature,
+                },
+                body: JSON.stringify(payload),
+              });
+
+              const resData = await res.json();
+              if (res.ok) {
+                console.log(
+                  `[${getCurrentTime()}] [INFO] Forwarded successfully`
+                );
+              } else {
+                console.error(
+                  `[${getCurrentTime()}] [ERROR] Error forwarding data:`,
+                  resData
+                );
+              }
+            } else {
+              console.log(
+                `[${getCurrentTime()}] [INFO] Ignored event '${payload.event}'`
+              );
+            }
+          } catch (error) {
+            console.error(
+              `[${getCurrentTime()}] [ERROR] Failed to handle event:`,
+              (error as Error).message
+            );
+          }
         } else {
           console.error(
-            `[${getCurrentTime()}] [ERROR] Error sending data to microservice:`,
-            resData
+            `[${getCurrentTime()}] [ERROR] Invalid JSON message: ${message}`
           );
         }
+      });
+
+      ws.on("error", (error: Error) => {
+        console.error(
+          `[${getCurrentTime()}] [ERROR] WebSocket error: ${error.message}`
+        );
+      });
+
+      ws.on("close", () => {
+        console.log(`[${getCurrentTime()}] [INFO] WebSocket connection closed`);
+      });
+
+      function isJsonString(str: string): boolean {
+        try {
+          JSON.parse(str);
+          return true;
+        } catch {
+          return false;
+        }
       }
-    } catch (error) {
-      console.error(
-        `[${getCurrentTime()}] [ERROR] Failed to parse incoming message or handle event:`,
-        (error as Error).message
-      );
     }
-  } else {
-    console.error(
-      `[${getCurrentTime()}] [ERROR] Incoming message is not valid JSON:`,
-      message
-    );
-  }
-});
-
-// Utility function to check if a string is valid JSON
-function isJsonString(str: string): boolean {
-  try {
-    JSON.parse(str);
-    console.log(`[${getCurrentTime()}] [INFO] Incoming message is valid JSON`);
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-// Handle WebSocket errors
-ws.on("error", (error: Error) => {
-  console.error(
-    `[${getCurrentTime()}] [ERROR] WebSocket error: ${error.message}`
-  );
-});
-
-// Handle WebSocket close event
-ws.on("close", () => {
-  console.log(`[${getCurrentTime()}] [INFO] WebSocket connection closed`);
-});
+  )
+  .help()
+  .alias("help", "h")
+  .demandCommand(1, "You need to specify a command.").argv;
