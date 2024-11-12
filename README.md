@@ -1,81 +1,179 @@
+# Local Hook CLI
 
-# WebSocket Client CLI for Microservice Interaction
+## Overview
 
-This project contains a CLI application that interacts with a WebSocket server and sends login notifications to a microservice when the `user.login` event is received. It is designed to be used in development environments where WebSocket messages are received and then sent to a microservice via a webhook on `localhost`.
+`local-hook-cli` is a WebSocket client CLI designed to interact with a WebSocket server and forward specific events to a microservice. The tool is ideal for local development, enabling you to test WebSocket interactions by sending event payloads to a locally running microservice.
 
 ## Features
 
-- **WebSocket connection**: Connects to a WebSocket server and sends a connection message with a token and microservice URL.
-- **Event handling**: Handles `user.login` events from the WebSocket server and sends the data to a specified microservice URL.
-- **Webhook integration**: The application sends a POST request to a microservice using a webhook URL on `localhost`, making it ideal for local development and testing.
-- **Logging**: Logs messages with timestamps for better tracking and troubleshooting.
+- **WebSocket Connection**: Connects to a WebSocket server.
+- **Event Handling**: Filters and processes specific events (e.g., `user.login`, `order.created`).
+- **Webhook Forwarding**: Sends the event payload to a specified microservice URL.
+- **Logging**: Provides detailed logs for debugging and tracking.
 
 ## Requirements
 
 - Node.js (>= v14)
-- WebSocket server running at a specified URL (local or remote)
-- A microservice capable of handling `user.login` events at the provided URL (typically a local server, e.g., `http://localhost:3001/open/hook`)
-- `node-fetch` for sending HTTP requests
+- WebSocket server URL (local or remote)
+- Microservice URL (e.g., `http://localhost:5000`)
 
 ## Installation
 
-1. Clone the repository:
+Clone the repository and install dependencies:
 
-   ```bash
-   git clone https://github.com/BSO-Space/socketlink.git
-   cd websocket-client-cli
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
+```bash
+git clone https://github.com/BSO-Space/local-hook-cli.git
+cd local-hook-cli
+npm install
+npm run build
+```
 
 ## Usage
 
-You can use the CLI tool to connect to the WebSocket server and interact with the microservice.
+### Using Node.js Directly
 
-### Command Line Arguments
+```bash
+node dist/cli.js listen --url ws://some.webhook.com:5434 --forward http://localhost:5000 --event user.login order.created --token your-auth-token
+```
 
-- `--url` or `-u`: WebSocket server URL (e.g., `ws://localhost:3005` or `ws://example.com`)
-- `--microservice-url` or `-m`: Microservice URL to send the login data to (e.g., `http://localhost:3001/open/hook`), ideal for local testing environments.
-- `--token` or `-t`: Authentication token to send with the microservice URL.
+### Using `local-hook-cli` Command
+
+After installing globally:
+
+```bash
+npm install -g local-hook-cli
+```
+
+Now, you can run:
+
+```bash
+local-hook-cli listen --url ws://some.webhook.com:5434 --forward http://localhost:5000 --event user.login order.created --token your-auth-token
+```
+
+### Command Options
+
+- `--url` or `-u`: WebSocket server URL.
+- `--forward` or `-f`: Microservice URL to forward the payload.
+- `--event` or `-e`: Events to listen for, space-separated (e.g., `user.login order.created`).
+- `--token` or `-t`: Authentication token.
 
 ### Example
 
 ```bash
-node cli.js --url ws://localhost:3005 --microservice-url "http://localhost:3001/open/hook" --token "cm3bwtymf0000qj6vr8ykrdku"
+local-hook-cli listen --url ws://some.webhook.com:5434 --forward http://localhost:5000 --event user.login order.created --token cm3bwtymf0000qj6vr8ykrdku
 ```
 
-### Expected Output
+## Payload Format
 
-1. **Connection message**: The client connects to the WebSocket server and sends the token and microservice URL.
-   - Example:
-     ```bash
-     [2024-11-11T11:42:30.666Z] [INFO] Connected to WebSocket server at ws://localhost:3005
-     [2024-11-11T11:42:30.668Z] [INFO] Sending connection message with token and microservice URL
-     ```
+The server sends messages in two possible formats:
 
-2. **Received message**: Any general WebSocket messages will be logged, except for the `user.login` events.
-   - Example:
-     ```bash
-     [2024-11-11T11:42:30.935Z] [INFO] General WebSocket Message: Hello World, blog 🎉👋
-     [2024-11-11T11:42:30.935Z] [ERROR] Incoming message is not valid JSON: Hello World, blog 🎉👋
-     ```
+1. **Plain Text** (Ignored unless JSON):
 
-3. **Handling `user.login` event**: When a `user.login` event is received, it sends the data to the microservice.
-   - Example:
-     ```bash
-     [2024-11-11T11:42:45.573Z] [INFO] Handling 'user.login' event from WebSocket server
-     ```
+   ```
+   Hello World, blog 🎉👋
+   ```
+2. **JSON** (Processed if event matches):
 
-### Local Development Use Case
+   ```json
+   {
+     "payload": "{\"event\":\"user.login\",\"user\":{\"id\":\"9cdf2c76-8f9b-4ec7-b298-a98516f61b6f\",\"username\":\"example.user\",\"email\":\"example@gmail.com\"},\"ip\":\"::ffff:192.168.112.1\"}",
+     "signature": "5f550b059312f2443e472c170d67ffea0a99df1b127b1d64a45eb0341cfca398",
+     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5Y2RmMmM3Ni04ZjliLTRlYzctYjI5OC1hOTg1MTZmNjFiNmYiLCJzZXJ2aWNlIjoiYmxvZyIsImlwIjoiOjpmZmZmOjE5Mi4xNjguMTEyLjEiLCJ1c2VyQWdlbnQiOiJNb3ppbGxhLzUuMCBDaHJvbWUvMTMwLjAiLCJpYXQiOjE3MzEzOTQxOTAsImV4cCI6MTczMTM5NDQ5MH0.Do1bYfL8xUYA77AtjWRLhyAPi3QGHEXztj-85vuGA5s"
+   }
+   ```
 
-This CLI tool is ideal for **local development** when you're testing WebSocket interactions and need to send data to your locally running microservice (e.g., on `http://localhost:3001`). The tool listens for `user.login` events on the WebSocket server and forwards this data directly to your microservice via a webhook.
+### Event Payload Example
 
-This setup is helpful when you are developing and testing your microservice and need to simulate the interaction with the WebSocket server in a local environment.
+For `user.login` event:
 
-### License
+```json
+{
+  "event": "user.login",
+  "user": {
+    "id": "9cdf2c76-8f9b-4ec7-b298-a98516f61b6f",
+    "username": "example.user",
+    "username": "example.user",
+    "email": "example@gmail.com"
+  },
+  "ip": "::ffff:192.168.112.1",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+}
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Example WebSocket 
+Here’s a sample WebSocket server that the CLI can connect to
+```
+import { WebSocketServer, WebSocket } from "ws"; 
+import http from "http"; 
+import { envConfig } from "./config/env.config"; 
+import { ServicesService } from "./services/service.service"; 
+import app from "./app";
+
+// Create the HTTP server using an Express app.
+const server = http.createServer(app); 
+
+// Service responsible for handling service-related logic.
+const servicesService = new ServicesService(); 
+
+// Store active WebSocket clients mapped by their IDs.
+export let webSocketClients: Map<string, WebSocket> = new Map(); 
+
+// Initialize the WebSocket server.
+const wss = new WebSocketServer({ server }); 
+
+wss.on("connection", (ws) => { 
+  let clientId: string | null = null; 
+
+  // Handle incoming messages from the client.
+  ws.on("message", async (message: string) => { 
+    try {
+      const data = JSON.parse(message); // Parse incoming JSON message.
+
+      // Validate the token and retrieve service details.
+      const existingService = await servicesService.findByToken(data.token); 
+
+      if (existingService) { 
+        clientId = existingService.id; // Assign client ID.
+        if (clientId) {
+          // Store WebSocket client.
+          webSocketClients.set(clientId, ws); 
+          console.log(`${existingService.name} service connected🌈🎉`); 
+        }
+
+        // Send acknowledgment message to the client.
+        ws.send(`Hello World, ${existingService.name} 🎉👋`); 
+      } else {
+        // Send error response if token is invalid.
+        ws.send(JSON.stringify({ message: "Token not valid" })); 
+      }
+    } catch (error) {
+      console.error("Error parsing client message", error); // Log parsing errors.
+    }
+  });
+
+  // Handle client disconnection.
+  ws.on("close", () => { 
+    if (clientId) {
+      // Remove the disconnected client from the active client map.
+      webSocketClients.delete(clientId); 
+      console.log(`Client with ID ${clientId} disconnected.`); 
+    }
+  });
+});
+
+// Start the HTTP and WebSocket server on the specified port.
+server.listen(envConfig.APP_PORT, () => { 
+  console.log(`Server running on http://localhost:${envConfig.APP_PORT}`); 
+});
+
+```
+## Logging
+
+Logs include timestamps and types for easy tracking:
+
+- **INFO**: General operation logs.
+- **ERROR**: Issues with invalid JSON or failed requests.
+
+## License
+
+This project is licensed under the MIT License.
